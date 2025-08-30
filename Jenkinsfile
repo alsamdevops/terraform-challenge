@@ -2,10 +2,12 @@ pipeline {
     agent any
 
     environment {
-        TF_DIR       = "terraform"
-        ANSIBLE_DIR  = "ansible"
-        GIT_BRANCH   = "main"
-        STATE_DIR    = "/var/lib/jenkins/terraform-state"
+        TF_DIR        = "terraform"
+        ANSIBLE_DIR   = "ansible"
+        STATE_DIR     = "/var/lib/jenkins"
+        GIT_REPO      = "https://github.com/alsamdevops/terraform-challenge.git"
+        GIT_BRANCH    = "main"
+        GIT_CRED      = "git-hubpat"
     }
 
     stages {
@@ -20,38 +22,30 @@ pipeline {
             }
         }
 
-        stage('Move hosts.ini to Ansible') {
-            steps {
-                sh """
-                    cp ${TF_DIR}/hosts.ini ${ANSIBLE_DIR}/hosts.ini
-                """
-            }
-        }
-
         stage('Run Ansible Playbook') {
             steps {
                 dir("${ANSIBLE_DIR}") {
                     sh """
-                        ansible-playbook -i hosts.ini site.yml
+                        ansible-playbook -i ../${TF_DIR}/hosts.ini site.yml
                     """
                 }
             }
         }
 
-        stage('Commit & Push hosts.ini to GitHub') {
+        stage('Commit & Push hosts.ini') {
             when {
-                expression { currentBuild.currentResult == 'SUCCESS' }
+                expression { fileExists("${TF_DIR}/hosts.ini") }
             }
             steps {
                 dir("${ANSIBLE_DIR}") {
-                    withCredentials([string(credentialsId: 'git-hubpat', variable: 'GITHUB_PAT')]) {
+                    withCredentials([usernamePassword(credentialsId: "${GIT_CRED}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
                         sh """
-                            git config user.name "Jenkins CI"
-                            git config user.email "jenkins@yourdomain.com"
-                            git checkout ${GIT_BRANCH}
+                            git config user.email "jenkins@local"
+                            git config user.name "Jenkins"
+                            git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/alsamdevops/terraform-challenge.git
+                            cp ../${TF_DIR}/hosts.ini ./hosts.ini
                             git add hosts.ini
-                            git commit -m "Update hosts.ini from Jenkins on $(date)" || true
-                            git remote set-url origin https://x-access-token:${GITHUB_PAT}@github.com/alsamdevops/terraform-challenge.git
+                            git commit -m "Added hosts.ini after successful Ansible run" || echo "No changes to commit"
                             git push origin ${GIT_BRANCH}
                         """
                     }
@@ -63,7 +57,7 @@ pipeline {
             steps {
                 sh """
                     mkdir -p ${STATE_DIR}
-                    cp ${TF_DIR}/terraform.tfstate ${STATE_DIR}/terraform.tfstate
+                    cp ${TF_DIR}/terraform.tfstate ${STATE_DIR}/terraform.tfstate || true
                 """
             }
         }
