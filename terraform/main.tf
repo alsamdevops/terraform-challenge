@@ -22,8 +22,9 @@ resource "aws_instance" "amazon_linux" {
               EOF
 
   provisioner "local-exec" {
-    command = "echo '[frontend]\nc8.local ansible_host=${self.public_ip} ansible_user=ec2-user' > inventory_part_frontend"
-  }
+  command = "echo '[frontend]\nc8.local ansible_host=${self.public_ip} ansible_user=ec2-user ansible_ssh_common_args=\"-o StrictHostKeyChecking=no\"' > inventory_part_frontend"
+}
+
 }
 
 # =========================
@@ -46,7 +47,7 @@ resource "aws_instance" "ubuntu" {
               EOF
 
   provisioner "local-exec" {
-    command = "echo '[backend]\nu21.local ansible_host=${self.public_ip} ansible_user=ubuntu' > inventory_part_backend"
+    command = "echo '[backend]\nu21.local ansible_host=${self.public_ip} ansible_user=ubuntu ansible_ssh_common_args=\"-o StrictHostKeyChecking=no\"' > inventory_part_backend"
   }
 }
 
