@@ -2,15 +2,22 @@ pipeline {
     agent any
 
     environment {
-        TF_DIR        = "terraform"
-        ANSIBLE_DIR   = "ansible"
-        STATE_DIR     = "/var/lib/jenkins"
-        GIT_REPO      = "https://github.com/alsamdevops/terraform-challenge.git"
-        GIT_BRANCH    = "main"
-        GIT_CRED      = "git-hubpat"
+        TF_DIR = "terraform"
+        ANSIBLE_DIR = "ansible"
+        STATE_DIR = "/var/lib/jenkins"
+        SSH_KEY = "/var/lib/jenkins/.ssh/new.pem"   // private key that matches your "new" key pair
     }
 
     stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    credentialsId: 'git-hubpat',
+                    url: 'https://github.com/alsamdevops/terraform-challenge.git'
+            }
+        }
+
         stage('Terraform Init & Apply') {
             steps {
                 dir("${TF_DIR}") {
@@ -22,50 +29,50 @@ pipeline {
             }
         }
 
-        stage('Run Ansible Playbook') {
+        stage('Wait for SSH') {
             steps {
-                dir("${ANSIBLE_DIR}") {
-                    sh """
-                        ansible-playbook -i ../${TF_DIR}/hosts.ini site.yaml
-                    """
-                }
-            }
-        }
-
-        stage('Commit & Push hosts.ini') {
-            when {
-                expression { fileExists("${TF_DIR}/hosts.ini") }
-            }
-            steps {
-                dir("${ANSIBLE_DIR}") {
-                    withCredentials([usernamePassword(credentialsId: "${GIT_CRED}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
-                        sh """
-                            git config user.email "jenkins@local"
-                            git config user.name "Jenkins"
-                            git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/alsamdevops/terraform-challenge.git
-                            cp ../${TF_DIR}/hosts.ini ./hosts.ini
-                            git add hosts.ini
-                            git commit -m "Added hosts.ini after successful Ansible run" || echo "No changes to commit"
-                            git push origin ${GIT_BRANCH}
-                        """
+                dir("${TF_DIR}") {
+                    script {
+                        def hosts = readFile('hosts.ini').split('\n')
+                        for (h in hosts) {
+                            if (h.trim() && !h.startsWith('[')) {
+                                def ip = h.split(' ')[0]
+                                sh """
+                                    echo "Waiting for SSH on ${ip}..."
+                                    until nc -zv ${ip} 22; do sleep 5; done
+                                """
+                            }
+                        }
                     }
                 }
             }
         }
 
-        stage('Save Terraform State') {
+        stage('Run Ansible Playbook') {
             steps {
-                sh """
-                    mkdir -p ${STATE_DIR}
-                    cp ${TF_DIR}/terraform.tfstate ${STATE_DIR}/terraform.tfstate || true
-                """
+                dir("${ANSIBLE_DIR}") {
+                    sh """
+                        ANSIBLE_HOST_KEY_CHECKING=False \
+                        ansible-playbook -i ../${TF_DIR}/hosts.ini site.yml \
+                        --private-key=${SSH_KEY}
+                    """
+                }
             }
         }
+
     }
 
     post {
+        success {
+            echo "Saving Terraform state..."
+            sh """
+                mkdir -p ${STATE_DIR}
+                cp -f ${TF_DIR}/terraform.tfstate ${STATE_DIR}/terraform.tfstate
+            """
+        }
         always {
-            cleanWs()
+            echo "Cleaning up workspace..."
+            deleteDir()
         }
     }
 }
