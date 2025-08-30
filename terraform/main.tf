@@ -24,7 +24,7 @@ resource "aws_instance" "amazon_linux" {
   provisioner "local-exec" {
     command = <<EOT
       echo "[frontend]" > inventory_part_frontend
-      echo "c8.local ansible_host=${self.public_ip} ansible_user=ec2-user ansible_ssh_private_key_file=jenkins/.ssh/new.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'" >> inventory_part_frontend
+      echo "c8.local ansible_host=${self.public_ip} ansible_user=ec2-user ansible_ssh_private_key_file=/var/lib/jenkins/.ssh/new.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'" >> inventory_part_frontend
     EOT
   }
 }
@@ -51,7 +51,7 @@ resource "aws_instance" "ubuntu" {
   provisioner "local-exec" {
     command = <<EOT
       echo "[backend]" > inventory_part_backend
-      echo "u21.local ansible_host=${self.public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=jenkins/.ssh/new.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'" >> inventory_part_backend
+      echo "u21.local ansible_host=${self.public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=/var/lib/jenkins/.ssh/new.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'" >> inventory_part_backend
     EOT
   }
 }
