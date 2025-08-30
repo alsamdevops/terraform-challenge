@@ -2,19 +2,15 @@ pipeline {
     agent any
 
     environment {
-        TF_DIR = "terraform"
-        ANSIBLE_DIR = "ansible"
-        STATE_DIR = "/var/lib/jenkins"
-        SSH_KEY = "/var/lib/jenkins/.ssh/new.pem"   // private key that matches your "new" key pair
+        TF_DIR = "terraform"   // folder in repo
+        ANSIBLE_DIR = "ansible" // folder in repo
+        STATE_DIR = "/var/lib/jenkins/terraform-states"
     }
 
     stages {
-
         stage('Checkout') {
             steps {
-                git branch: 'main',
-                    credentialsId: 'git-hubpat',
-                    url: 'https://github.com/alsamdevops/terraform-challenge.git'
+                git branch: 'main', credentialsId: 'git-hubpat', url: 'https://github.com/alsamdevops/terraform-challenge.git'
             }
         }
 
@@ -29,22 +25,10 @@ pipeline {
             }
         }
 
-        stage('Wait for SSH') {
+        stage('Sleep for EC2 Init') {
             steps {
-                dir("${TF_DIR}") {
-                    script {
-                        def hosts = readFile('hosts.ini').split('\n')
-                        for (h in hosts) {
-                            if (h.trim() && !h.startsWith('[')) {
-                                def ip = h.split(' ')[0]
-                                sh """
-                                    echo "Waiting for SSH on ${ip}..."
-                                    until nc -zv ${ip} 22; do sleep 5; done
-                                """
-                            }
-                        }
-                    }
-                }
+                echo "Sleeping 60 seconds to allow EC2 instances to initialize..."
+                sh "sleep 60"
             }
         }
 
@@ -52,26 +36,24 @@ pipeline {
             steps {
                 dir("${ANSIBLE_DIR}") {
                     sh """
-                        ANSIBLE_HOST_KEY_CHECKING=False \
-                        ansible-playbook -i ../${TF_DIR}/hosts.ini site.yml \
-                        --private-key=${SSH_KEY}
+                        ansible-playbook -i ../${TF_DIR}/hosts.ini site.yml
                     """
                 }
             }
         }
-
     }
 
     post {
         success {
-            echo "Saving Terraform state..."
+            echo "Archiving terraform.tfstate and hosts.ini"
             sh """
                 mkdir -p ${STATE_DIR}
-                cp -f ${TF_DIR}/terraform.tfstate ${STATE_DIR}/terraform.tfstate
+                cp ${TF_DIR}/terraform.tfstate ${STATE_DIR}/terraform.tfstate
+                cp ${TF_DIR}/hosts.ini ${STATE_DIR}/hosts.ini
             """
         }
-        always {
-            echo "Cleaning up workspace..."
+        cleanup {
+            echo "Cleaning workspace..."
             deleteDir()
         }
     }
