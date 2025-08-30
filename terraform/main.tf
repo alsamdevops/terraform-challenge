@@ -64,7 +64,7 @@ resource "null_resource" "merge_inventory" {
 
   provisioner "local-exec" {
     command = <<EOT
-      sleep 60
+      sleep 90
       cat inventory_part_frontend inventory_part_backend > hosts.ini
       echo "Inventory generated: hosts.ini"
     EOT
