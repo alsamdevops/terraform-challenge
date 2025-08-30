@@ -1,0 +1,28 @@
+---
+- name: Install dependencies for Netdata
+  apt:
+    name: software-properties-common
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Install Netdata
+  apt:
+    name: netdata
+    state: present
+    update_cache: yes
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Ensure Netdata runs on port 19999
+  lineinfile:
+    path: /etc/netdata/netdata.conf
+    regexp: '^#? bind socket to IP'
+    line: '        bind socket to IP = 0.0.0.0'
+  notify: Restart netdata
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Ensure Netdata is running
+  service:
+    name: netdata
+    state: started
+    enabled: yes
+

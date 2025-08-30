@@ -1,0 +1,26 @@
+pipeline {
+    agent any
+
+    environment {
+        TF_DIR = "terraform"
+    }
+
+    stages {
+        stage('Terraform Destroy') {
+            steps {
+                dir("${TF_DIR}") {
+                    sh """
+                        terraform destroy -auto-approve
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Infrastructure destroyed successfully."
+        }
+    }
+}
+

@@ -1,0 +1,30 @@
+---
+- name: Install nginx
+  package:
+    name: nginx
+    state: present
+
+- name: Configure nginx proxy
+  copy:
+    dest: /etc/nginx/conf.d/proxy.conf
+    content: |
+      server {
+          listen 80;
+          location / {
+              proxy_pass http://{{ groups['backend'][0] }}:19999;
+          }
+      }
+  notify: Restart nginx
+
+- name: Ensure nginx is running
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: Reload nginx
+  service:
+    name: nginx
+    state: reloaded
+  when: ansible_run_tags is defined and 'Restart nginx' in ansible_run_tags
+
