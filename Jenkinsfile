@@ -36,7 +36,7 @@ pipeline {
             steps {
                 dir("${ANSIBLE_DIR}") {
                     sh """
-                        ansible-playbook -i ../${TF_DIR}/hosts.ini site.yml
+                        ansible-playbook -i ../${TF_DIR}/hosts.ini site.yaml
                     """
                 }
             }
