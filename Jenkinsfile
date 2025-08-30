@@ -4,7 +4,6 @@ pipeline {
     environment {
         TF_DIR       = "terraform"
         ANSIBLE_DIR  = "ansible"
-        GIT_REPO     = "https://github.com/alsamdevops/terraform-challenge.git"
         GIT_BRANCH   = "main"
         STATE_DIR    = "/var/lib/jenkins/terraform-state"
     }
@@ -50,10 +49,10 @@ pipeline {
                             git config user.name "Jenkins CI"
                             git config user.email "jenkins@yourdomain.com"
                             git checkout ${GIT_BRANCH}
-                            git pull ${GIT_REPO} ${GIT_BRANCH} || true
                             git add hosts.ini
                             git commit -m "Update hosts.ini from Jenkins on $(date)" || true
-                            git push https://x-access-token:${GITHUB_PAT}@github.com/alsamdevops/terraform-challenge.git ${GIT_BRANCH}
+                            git remote set-url origin https://x-access-token:${GITHUB_PAT}@github.com/alsamdevops/terraform-challenge.git
+                            git push origin ${GIT_BRANCH}
                         """
                     }
                 }
