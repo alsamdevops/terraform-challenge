@@ -1,0 +1,67 @@
+---
+- name: Common configuration for all hosts
+  hosts: all
+  become: true
+  tasks:
+    - name: Disable SELinux (Amazon Linux only)
+      command: setenforce 0
+      when: ansible_distribution == "Amazon"
+
+    - name: Permanently disable SELinux in config (Amazon Linux only)
+      replace:
+        path: /etc/selinux/config
+        regexp: '^SELINUX=.*'
+        replace: 'SELINUX=disabled'
+      when: ansible_distribution == "Amazon"
+
+    - name: Disable firewalld if present
+      service:
+        name: firewalld
+        state: stopped
+        enabled: no
+      ignore_errors: yes
+
+- name: Configure frontend (c8.local)
+  hosts: frontend
+  become: true
+  tasks:
+    - name: Install Nginx
+      package:
+        name: nginx
+        state: present
+
+    - name: Configure Nginx to proxy to backend:19999
+      copy:
+        dest: /etc/nginx/conf.d/proxy.conf
+        content: |
+          server {
+            listen 80;
+            server_name _;
+            location / {
+              proxy_pass http://{{ hostvars['u21.local']['ansible_host'] }}:19999/;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+            }
+          }
+
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+        enabled: yes
+
+- name: Configure backend (u21.local)
+  hosts: backend
+  become: true
+  tasks:
+    - name: Install Netdata
+      apt:
+        name: netdata
+        state: present
+        update_cache: yes
+
+    - name: Ensure Netdata is running
+      service:
+        name: netdata
+        state: started
+        enabled: yes
